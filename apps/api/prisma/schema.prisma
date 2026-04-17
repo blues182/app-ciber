@@ -1,0 +1,274 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum RecordStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TripStatus {
+  CREATED
+  IN_PROGRESS
+  COMPLETED
+  CANCELED
+}
+
+enum MaintenanceStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+  CANCELED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  DEACTIVATE
+  TRIP_CLOSE
+  MAINTENANCE_CLOSE
+  INVENTORY_MOVEMENT
+}
+
+model User {
+  id           String       @id @default(cuid())
+  name         String
+  email        String       @unique
+  passwordHash String
+  isActive     Boolean      @default(true)
+  roleId       String
+  role         Role         @relation(fields: [roleId], references: [id])
+  audits       AuditLog[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  users       User[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Permission {
+  id        String           @id @default(cuid())
+  module    String
+  action    String
+  roles     RolePermission[]
+  createdAt DateTime         @default(now())
+
+  @@unique([module, action])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+}
+
+model Client {
+  id          String    @id @default(cuid())
+  businessName String
+  taxId       String?
+  phone       String?
+  email       String?
+  creditLimit Decimal?  @db.Decimal(14, 2)
+  status      RecordStatus @default(ACTIVE)
+  trips       Trip[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Provider {
+  id             String    @id @default(cuid())
+  businessName   String
+  serviceType    String
+  phone          String?
+  email          String?
+  status         RecordStatus @default(ACTIVE)
+  maintenances   Maintenance[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Driver {
+  id              String    @id @default(cuid())
+  fullName        String
+  licenseNumber   String
+  licenseExpiry   DateTime
+  status          RecordStatus @default(ACTIVE)
+  trips           Trip[]
+  documents       Document[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Trailer {
+  id              String    @id @default(cuid())
+  economicNumber  String    @unique
+  plates          String?
+  mileage         Int?
+  brand           String?
+  model           String?
+  color           String?
+  status          RecordStatus @default(ACTIVE)
+  trips           Trip[]
+  maintenances    Maintenance[]
+  documents       Document[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Remolque {
+  id              String    @id @default(cuid())
+  economicNumber  String    @unique
+  plates          String?
+  mileage         Int?
+  brand           String?
+  model           String?
+  color           String?
+  status          RecordStatus @default(ACTIVE)
+  trips           Trip[]
+  maintenances    Maintenance[]
+  documents       Document[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Trip {
+  id              String      @id @default(cuid())
+  orderNumber     String
+  folio           String?
+  cargoType       String?
+  status          TripStatus   @default(CREATED)
+  startDate       DateTime
+  endDate         DateTime?
+  distanceKm      Decimal      @default(0) @db.Decimal(14, 2)
+  dieselLiters    Decimal      @default(0) @db.Decimal(14, 2)
+  dieselCost      Decimal      @default(0) @db.Decimal(14, 2)
+  tollsCost       Decimal      @default(0) @db.Decimal(14, 2)
+  operatorSalary  Decimal      @default(0) @db.Decimal(14, 2)
+  otherExpenses   Decimal      @default(0) @db.Decimal(14, 2)
+  income          Decimal      @default(0) @db.Decimal(14, 2)
+  expenses        Decimal      @default(0) @db.Decimal(14, 2)
+  utility         Decimal      @default(0) @db.Decimal(14, 2)
+  clientId        String
+  driverId        String
+  trailerId       String
+  remolqueId      String?
+  client          Client       @relation(fields: [clientId], references: [id])
+  driver          Driver       @relation(fields: [driverId], references: [id])
+  trailer         Trailer      @relation(fields: [trailerId], references: [id])
+  remolque        Remolque?    @relation(fields: [remolqueId], references: [id])
+  documents       Document[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([orderNumber])
+  @@index([status])
+  @@index([startDate])
+}
+
+model Maintenance {
+  id              String            @id @default(cuid())
+  type            String
+  description     String
+  maintenanceDate DateTime
+  mileage         Int?
+  workshop        String?
+  laborCost       Decimal           @default(0) @db.Decimal(14, 2)
+  partsCost       Decimal           @default(0) @db.Decimal(14, 2)
+  totalCost       Decimal           @default(0) @db.Decimal(14, 2)
+  status          MaintenanceStatus @default(OPEN)
+  trailerId       String?
+  remolqueId      String?
+  providerId      String?
+  trailer         Trailer?          @relation(fields: [trailerId], references: [id])
+  remolque        Remolque?         @relation(fields: [remolqueId], references: [id])
+  provider        Provider?         @relation(fields: [providerId], references: [id])
+  partsUsed       MaintenancePart[]
+  documents       Document[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model SparePart {
+  id            String            @id @default(cuid())
+  sku           String            @unique
+  barcode       String?           @unique
+  name          String
+  description   String?
+  stock         Int               @default(0)
+  minimumStock  Int               @default(0)
+  unitCost      Decimal           @default(0) @db.Decimal(14, 2)
+  movements     InventoryMovement[]
+  maintenanceUse MaintenancePart[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+}
+
+model InventoryMovement {
+  id           String   @id @default(cuid())
+  sparePartId  String
+  quantity     Int
+  movementType String
+  reason       String?
+  sparePart    SparePart @relation(fields: [sparePartId], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([sparePartId, createdAt])
+}
+
+model MaintenancePart {
+  maintenanceId String
+  sparePartId   String
+  quantity      Int
+  unitCost      Decimal      @default(0) @db.Decimal(14, 2)
+  maintenance   Maintenance  @relation(fields: [maintenanceId], references: [id])
+  sparePart     SparePart    @relation(fields: [sparePartId], references: [id])
+
+  @@id([maintenanceId, sparePartId])
+}
+
+model Document {
+  id            String   @id @default(cuid())
+  fileName      String
+  fileUrl       String
+  mimeType      String
+  trailerId     String?
+  remolqueId    String?
+  driverId      String?
+  tripId        String?
+  maintenanceId String?
+  trailer       Trailer?     @relation(fields: [trailerId], references: [id])
+  remolque      Remolque?    @relation(fields: [remolqueId], references: [id])
+  driver        Driver?      @relation(fields: [driverId], references: [id])
+  trip          Trip?        @relation(fields: [tripId], references: [id])
+  maintenance   Maintenance? @relation(fields: [maintenanceId], references: [id])
+  createdAt     DateTime @default(now())
+}
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  userId      String
+  module      String
+  action      AuditAction
+  recordId    String
+  metadata    String?
+  user        User        @relation(fields: [userId], references: [id])
+  createdAt   DateTime    @default(now())
+
+  @@index([module, createdAt])
+  @@index([userId, createdAt])
+}

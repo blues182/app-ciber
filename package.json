@@ -1,0 +1,22 @@
+{
+  "name": "app-ciber",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Plataforma administrativa para empresa de transporte",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n API,WEB -c cyan,magenta \"npm run dev -w @app-ciber/api\" \"npm run dev -w @app-ciber/web\"",
+    "dev:api": "npm run dev -w @app-ciber/api",
+    "dev:web": "npm run dev -w @app-ciber/web",
+    "build": "npm run build --workspaces",
+    "lint": "npm run lint --workspaces"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
